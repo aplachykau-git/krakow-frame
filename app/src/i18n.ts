@@ -1,0 +1,70 @@
+export type Lang = 'en' | 'pl';
+
+export const translations = {
+  en: {
+    title: 'Kraków Frame Maker',
+    uploadArtwork: 'Upload Artwork',
+    changeImage: 'Change Image',
+    browseFiles: 'Browse Files',
+    frameElements: 'Frame Elements',
+    zaprText1Label: 'Inviting 1 — text (one line per row)',
+    zaprText2Label: 'Inviting 2 — text (one line per row)',
+    belkaLabel: 'Footer — Footer text',
+    belkaPlaceholder: 'Institution name...',
+    stopkaLabel: 'Sponsors — Sponsor Logos',
+    addLogos: 'Add Logos',
+    colorTheme: 'Color Theme',
+    exportFormat: 'Export Format',
+    exportResult: 'Export Result',
+    dropTitle: 'Drop your image here',
+    dropSub: 'Drag and drop an artwork file, or use the button below to browse.',
+    // Frame element tile names
+    belkaTile: 'Footer',
+    stopkaTile: 'Sponsors',
+    zaprTile: 'Inviting',
+    // Color themes in English
+    themeBasic: 'Basic Version',
+    themeNeg: 'Negative Version',
+    themeAchroBlack: 'Achromatic Negative',
+    themeAchroWhite: 'Achromatic Positive',
+    // Export formats
+    fmtPng: 'PNG (Raster with Transparency)',
+    fmtJpeg: 'JPEG (Raster Solid)',
+    fmtSvg: 'SVG (Infinite Scale Vector)',
+    fmtPdf: 'PDF (Print Format Document)',
+  },
+  pl: {
+    title: 'Kraków Frame Maker',
+    uploadArtwork: 'Prześlij grafikę',
+    changeImage: 'Zmień zdjęcie',
+    browseFiles: 'Przeglądaj',
+    frameElements: 'Elementy ramki',
+    zaprText1Label: 'Zapraszający 1 — tekst (jeden wiersz w rzędzie)',
+    zaprText2Label: 'Zapraszający 2 — tekst (jeden wiersz w rzędzie)',
+    belkaLabel: 'Belka — Tekst belki',
+    belkaPlaceholder: 'Nazwa instytucji...',
+    stopkaLabel: 'Stopka — Logotypy sponsorów',
+    addLogos: 'Dodaj logotypy',
+    colorTheme: 'Motyw kolorystyczny',
+    exportFormat: 'Format eksportu',
+    exportResult: 'Eksportuj wynik',
+    dropTitle: 'Upuść zdjęcie tutaj',
+    dropSub: 'Przeciągnij i upuść plik graficzny lub użyj przycisku poniżej.',
+    // Frame element tile names (Polish)
+    belkaTile: 'Belka',
+    stopkaTile: 'Stopka',
+    zaprTile: 'Zapraszający',
+    // Color themes (official SIW Polish names)
+    themeBasic: 'Wersja podstawowa',
+    themeNeg: 'Wersja negatywowa',
+    themeAchroBlack: 'Wersja achromatyczna negatyw',
+    themeAchroWhite: 'Wersja achromatyczna pozytyw',
+    // Export formats
+    fmtPng: 'PNG (Rastrowy z przezroczystością)',
+    fmtJpeg: 'JPEG (Rastrowy pełny)',
+    fmtSvg: 'SVG (Wektorowy nieskończona skala)',
+    fmtPdf: 'PDF (Format dokumentu druku)',
+  },
+} as const;
+
+export type Translations = typeof translations.en;
