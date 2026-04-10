@@ -17,6 +17,7 @@ function App() {
   const [theme, setTheme] = useState<ThemeColor>('blue');
   const [exportFormat, setExportFormat] = useState<ExportFormat>('png');
   const [lang, setLang] = useState<Lang>('pl');
+  const [customColor, setCustomColor] = useState<string>('#ed1c24');
   const t = translations[lang];
 
   // Additive layer toggles
@@ -52,7 +53,7 @@ function App() {
     } else {
       drawCanvas();
     }
-  }, [imageSrc, theme, hasBelka, hasStopka, zapraszajacyCount, zapr1Text, zapr2Text, belkaText, sponsorLogos]);
+  }, [imageSrc, theme, customColor, hasBelka, hasStopka, zapraszajacyCount, zapr1Text, zapr2Text, belkaText, sponsorLogos]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -108,6 +109,7 @@ function App() {
       case 'negative': return { boxColor: '#ffffff', textColor: '#005baa' };
       case 'achromatic-black': return { boxColor: '#000000', textColor: '#ffffff' };
       case 'achromatic-white': return { boxColor: '#ffffff', textColor: '#000000' };
+      case 'custom': return { boxColor: customColor, textColor: '#ffffff' };
       default: return { boxColor: '#005baa', textColor: '#ffffff' };
     }
   };
@@ -122,7 +124,8 @@ function App() {
     img.src = imageSrc;
     img.onload = () => {
       const { U, M, S } = calculateDimensions(img.width, img.height);
-      const { frame: frameColor } = getThemeColors(theme);
+      const { frame: defaultFrameColor } = getThemeColors(theme);
+      const frameColor = theme === 'custom' ? customColor : defaultFrameColor;
       const { boxColor, textColor } = getBoxColors();
       const strokeOffset = S / 2;
 
@@ -244,7 +247,7 @@ function App() {
       };
       logoImg.src = base64Data;
     };
-  }, [imageSrc, theme, hasBelka, hasStopka, zapraszajacyCount, zapr1Text, zapr2Text, belkaText, sponsorLogos]);
+  }, [imageSrc, theme, customColor, hasBelka, hasStopka, zapraszajacyCount, zapr1Text, zapr2Text, belkaText, sponsorLogos]);
 
   const handleExport = async () => {
     const canvas = canvasRef.current;
@@ -316,7 +319,8 @@ function App() {
     const w = canvasRef.current.width;
     const totalH = canvasRef.current.height;
     const { U, M, S } = calculateDimensions(w, totalH);
-    const { frame: frameColor } = getThemeColors(theme);
+    const { frame: defaultFrameColor } = getThemeColors(theme);
+    const frameColor = theme === 'custom' ? customColor : defaultFrameColor;
     const { boxColor, textColor } = getBoxColors();
     const so = S / 2;
     const lH = U;
@@ -504,8 +508,27 @@ function App() {
                   <option value="negative">{t.themeNeg}</option>
                   <option value="achromatic-black">{t.themeAchroBlack}</option>
                   <option value="achromatic-white">{t.themeAchroWhite}</option>
+                  <option value="custom">{t.themeCustom}</option>
                 </select>
               </div>
+              {theme === 'custom' && (
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  <input
+                    type="color"
+                    value={customColor}
+                    onChange={e => setCustomColor(e.target.value)}
+                    style={{ width: '40px', height: '40px', padding: '0', border: '1px solid #1f2937', borderRadius: '4px', cursor: 'pointer', background: 'none' }}
+                  />
+                  <input
+                    type="text"
+                    value={customColor}
+                    onChange={e => setCustomColor(e.target.value)}
+                    className="text-input"
+                    style={{ flex: 1 }}
+                    placeholder="#HEXCODE"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Export Format */}

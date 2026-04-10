@@ -27,6 +27,7 @@ export const translations = {
     themeNeg: 'Negative Version',
     themeAchroBlack: 'Achromatic Negative',
     themeAchroWhite: 'Achromatic Positive',
+    themeCustom: 'Custom Color',
     // Export formats
     fmtPng: 'PNG (Raster with Transparency)',
     fmtJpeg: 'JPEG (Raster Solid)',
@@ -59,6 +60,7 @@ export const translations = {
     themeNeg: 'Wersja negatywowa',
     themeAchroBlack: 'Wersja achromatyczna negatyw',
     themeAchroWhite: 'Wersja achromatyczna pozytyw',
+    themeCustom: 'Własny kolor',
     // Export formats
     fmtPng: 'PNG (Rastrowy z przezroczystością)',
     fmtJpeg: 'JPEG (Rastrowy pełny)',

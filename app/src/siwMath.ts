@@ -8,7 +8,7 @@ export interface SIWDimensions {
 
 export type Orientation = 'vertical' | 'horizontal' | 'square';
 export type Variant = 'podstawowa' | 'stopka' | 'apla' | 'belka' | 'bez_ramy';
-export type ThemeColor = 'blue' | 'negative' | 'achromatic-black' | 'achromatic-white';
+export type ThemeColor = 'blue' | 'negative' | 'achromatic-black' | 'achromatic-white' | 'custom';
 
 export function calculateDimensions(width: number, height: number): SIWDimensions {
   const orientation: Orientation = (width === height) ? 'square' : (height > width) ? 'vertical' : 'horizontal';
@@ -36,6 +36,8 @@ export function getThemeColors(theme: ThemeColor) {
       return { frame: '#000000', logo: 'black' };
     case 'achromatic-white':
       return { frame: '#ffffff', logo: 'white' };
+    case 'custom':
+      return { frame: '#000000', logo: 'white' }; // The custom frame color will be handled in App.tsx
     default:
       return { frame: '#005baa', logo: '#005baa' };
   }
