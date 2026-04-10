@@ -30,13 +30,20 @@ body {
   overflow: hidden;
 }
 
+#root {
+  display: flex;
+  flex: 1;
+  width: 100%;
+}
+
 .app-container {
   display: flex;
-  width: 100%;
+  flex: 1;
   height: 100vh;
 }
 
 .sidebar {
+  flex: 0 0 380px;
   width: 380px;
   background: var(--surface-color);
   backdrop-filter: blur(var(--glass-blur));
@@ -166,6 +173,12 @@ input[type="file"] {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  transition: opacity 0.3s;
+}
+
+.settings-panel.disabled {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .select-wrapper {
@@ -251,7 +264,6 @@ select:focus {
   justify-content: center;
   position: relative;
   background: #ffffff;
-  width: 100%;
   height: 100%;
   overflow: auto;
 }
@@ -299,7 +311,9 @@ select:focus {
   cursor: pointer;
   transition: all 0.22s ease;
   user-select: none;
-  max-width: 480px;
+  width: 75%;
+  max-width: 800px;
+  min-height: 350px;
   text-align: center;
 }
 

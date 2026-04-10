@@ -11,10 +11,30 @@ export type Variant = 'podstawowa' | 'stopka' | 'apla' | 'belka' | 'bez_ramy';
 export type ThemeColor = 'blue' | 'negative' | 'achromatic-black' | 'achromatic-white' | 'custom';
 
 export function calculateDimensions(width: number, height: number): SIWDimensions {
-  const orientation: Orientation = (width === height) ? 'square' : (height > width) ? 'vertical' : 'horizontal';
+  const isPortrait = height > width;
+  const isLandscape = width > height;
+  const isExtremeLandscape = isLandscape && width >= 1.5 * height;
+  const isExtremePortrait = isPortrait && height >= 2.3 * width;
+
+  let U: number;
   
-  // SIW Guidelines: Vertical layouts use H/15, Horizontal/Square use H/10.5
-  const U = orientation === 'vertical' ? height / 15 : height / 10.5;
+  // SIW Grid Logic: The logo box width (3.2567 * U) must be exactly 1/5, 1/3, or 1/2 
+  // of the INNER frame width (width - U).
+  // 1/5 of inner width: 3.2567 U = 0.2 * (W - U)  => 3.4567 U = 0.2 W => U = W / 17.2835
+  // 1/3 of inner width: 3.2567 U = 1/3 * (W - U)  => 3.5900 U = 0.333 W => U = W / 10.7701
+  // 1/2 of inner width: 3.2567 U = 0.5 * (W - U)  => 3.7567 U = 0.5 W => U = W / 7.5134
+
+  if (isExtremeLandscape) {
+    // Exactly 5 logos fit in the inner frame
+    U = width / 17.2835;
+  } else if (isExtremePortrait) {
+    // Exactly 2 logos fit in the inner frame
+    U = width / 7.5134;
+  } else {
+    // Square, Standard Landscape, or Standard Portrait (3 logos fit in the inner frame)
+    U = width / 10.7701;
+  }
+  
   const M = 0.5 * U;
   const S = 0.1 * U;
 

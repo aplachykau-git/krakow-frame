@@ -12,8 +12,46 @@ interface SponsorLogo {
   name: string;
 }
 
+const computeWrappedLines = (
+  text: string, 
+  availWidth: number, 
+  measure: (s: string) => number
+): { lines: string[], isTooLong: boolean } => {
+  const paragraphs = text.split('\n');
+  let lines: string[] = [];
+  let isTooLong = false;
+
+  for (const para of paragraphs) {
+    if (para === '') { 
+      lines.push(''); 
+      continue; 
+    }
+    const words = para.split(' ');
+    let currentLine = words[0];
+    if (measure(currentLine) > availWidth) {
+      isTooLong = true; break;
+    }
+    for (let i = 1; i < words.length; i++) {
+      const word = words[i];
+      if (measure(currentLine + " " + word) <= availWidth) {
+        currentLine += " " + word;
+      } else {
+        lines.push(currentLine);
+        currentLine = word;
+        if (measure(currentLine) > availWidth) {
+          isTooLong = true; break;
+        }
+      }
+    }
+    lines.push(currentLine);
+    if (isTooLong) break;
+  }
+  return { lines, isTooLong };
+};
+
 function App() {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [rawUploadedSvg, setRawUploadedSvg] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeColor>('blue');
   const [exportFormat, setExportFormat] = useState<ExportFormat>('png');
   const [lang, setLang] = useState<Lang>('pl');
@@ -28,6 +66,7 @@ function App() {
   // Zapraszający content — use real newlines so textarea & split work correctly
   const [zapr1Text, setZapr1Text] = useState("JAN KOWALSKI\nPREZYDENT MIASTA KRAKOWA\nZAPRASZA");
   const [zapr2Text, setZapr2Text] = useState("JAN NOWAK\nPRZEWODNICZĄCY RADY MIASTA KRAKOWA\nZAPRASZA");
+  const [zaprTransparentBg, setZaprTransparentBg] = useState(false);
 
   // Belka content
   const [belkaText, setBelkaText] = useState('INSTYTUCJA KULTURY MIASTA KRAKOWA');
@@ -53,7 +92,7 @@ function App() {
     } else {
       drawCanvas();
     }
-  }, [imageSrc, theme, customColor, hasBelka, hasStopka, zapraszajacyCount, zapr1Text, zapr2Text, belkaText, sponsorLogos]);
+  }, [imageSrc, theme, customColor, hasBelka, hasStopka, zapraszajacyCount, zapr1Text, zapr2Text, zaprTransparentBg, belkaText, sponsorLogos]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -62,6 +101,16 @@ function App() {
 
   const loadFile = (file: File) => {
     if (!file.type.startsWith('image/')) return;
+
+    // Extract raw vector paths if SVG
+    if (file.type === 'image/svg+xml' || file.name.endsWith('.svg')) {
+      const textReader = new FileReader();
+      textReader.onload = ev => setRawUploadedSvg(ev.target?.result as string);
+      textReader.readAsText(file);
+    } else {
+      setRawUploadedSvg(null);
+    }
+
     const reader = new FileReader();
     reader.onload = ev => setImageSrc(ev.target?.result as string);
     reader.readAsDataURL(file);
@@ -103,7 +152,7 @@ function App() {
 
   const removeSponsorLogo = (id: string) => setSponsorLogos(prev => prev.filter(l => l.id !== id));
 
-  const getBoxColors = () => {
+  const getBoxColors = useCallback(() => {
     switch (theme) {
       case 'blue': return { boxColor: '#005baa', textColor: '#ffffff' };
       case 'negative': return { boxColor: '#ffffff', textColor: '#005baa' };
@@ -111,6 +160,41 @@ function App() {
       case 'achromatic-white': return { boxColor: '#ffffff', textColor: '#000000' };
       case 'custom': return { boxColor: customColor, textColor: '#ffffff' };
       default: return { boxColor: '#005baa', textColor: '#ffffff' };
+    }
+  }, [theme, customColor]);
+
+  const validateAndSetText = (newText: string, setter: (val: string) => void, type: 'belka' | 'zapr') => {
+    if (!canvasRef.current || !imageSrc) return setter(newText);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return setter(newText);
+
+    const w = canvasRef.current.width;
+    const h = canvasRef.current.height;
+    const { U, M } = calculateDimensions(w, h);
+
+    let fontSize, availableW, letterSpacing;
+    if (type === 'zapr') {
+      fontSize = 0.14 * U;
+      const zaprPad = 0.15 * U; // Increased padding for more space from edges
+      const logoW = U * (466.944 / 143.38);
+      availableW = logoW - 2 * zaprPad;
+      letterSpacing = '0.005em';
+    } else {
+      fontSize = 0.22 * U;
+      const paddingX = 1.0 * U;
+      availableW = w - 2 * M - paddingX;
+      letterSpacing = '0.05em';
+    }
+
+    ctx.font = `bold ${fontSize}px Lato, sans-serif`;
+    (ctx as any).letterSpacing = letterSpacing;
+
+    const measure = (s: string) => ctx.measureText(s).width;
+    const { lines, isTooLong } = computeWrappedLines(newText.toUpperCase(), availableW, measure);
+
+    if (!isTooLong && lines.length <= 3) {
+      setter(newText);
     }
   };
 
@@ -135,28 +219,53 @@ function App() {
       const footerH = hasStopka ? footerPad + footerLogoH + footerPad : 0;
 
       canvas.width = img.width;
-      canvas.height = img.height + footerH;
+      canvas.height = img.height;
 
-      // White background (covers footer area)
+      // White background (base canvas)
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Base image
       ctx.drawImage(img, 0, 0);
 
+      // ── Stopka Background (Overlaid over the entire bottom) ──
+      if (hasStopka) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, img.height - footerH, img.width, footerH);
+      }
+
       // ── Belka ──
       if (hasBelka) {
-        const bY = img.height - 1.0 * U;
-        const bH = 0.5 * U;
+        const rawText = belkaText.toUpperCase().trim();
+        ctx.font = `bold ${0.22 * U}px Lato, sans-serif`;
+        (ctx as any).letterSpacing = '0.05em';
+        
+        const paddingX = 1.0 * U;
+        const availableW = img.width - 2 * M - paddingX;
+        
+        const measure = (s: string) => ctx.measureText(s).width;
+        let { lines } = computeWrappedLines(rawText, availableW, measure);
+        if (lines.length === 0) lines = [''];
+        if (lines.length > 3) lines = lines.slice(0, 3);
+
+        const lineHeight = 0.3 * U;
+        const bH = 0.5 * U + (lines.length - 1) * 0.3 * U;
+        const stopkaOffset = hasStopka ? footerH : 0;
+        const bY = img.height - M - stopkaOffset - bH;
+
         ctx.fillStyle = boxColor;
         ctx.fillRect(M, bY, img.width - 2 * M, bH);
-        const text = belkaText.toUpperCase().trim();
+        
         ctx.fillStyle = textColor;
-        ctx.font = `bold ${0.22 * U}px Lato, sans-serif`;
         (ctx as any).letterSpacing = '0.05em';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(text, img.width / 2, bY + bH / 2);
+        
+        const opticalOffsetY = 0.015 * U; // Optical adjustment to center uppercase text visually
+        const startY = bY + bH / 2 - (lines.length - 1) * lineHeight / 2 + opticalOffsetY;
+        lines.forEach((line, i) => {
+          ctx.fillText(line, img.width / 2, startY + i * lineHeight);
+        });
         (ctx as any).letterSpacing = '0px';
       }
 
@@ -173,18 +282,28 @@ function App() {
 
         // Helper: draw one white block with centered blue multiline text
         const drawZaprBlock = (text: string, blockY: number) => {
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(zaprX, blockY, zaprW, zaprBlockH);
+          if (!zaprTransparentBg) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(zaprX, blockY, zaprW, zaprBlockH);
+          }
 
-          const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-          const fontSize = 0.11 * U;    // sized to fit 3 lines inside 0.6U block
-          const lineH = fontSize * 1.2; // tight but readable line spacing
+          const rawText = text.toUpperCase().trim();
+          const fontSize = 0.14 * U;
+          const lineH = fontSize * 1.15;
+          ctx.font = `bold ${fontSize}px Lato, sans-serif`;
+          (ctx as any).letterSpacing = '0.005em';
+
+          const zaprPad = 0.15 * U; // Increased padding
+          const availableW = zaprW - 2 * zaprPad;
+          const measure = (s: string) => ctx.measureText(s).width;
+          let { lines } = computeWrappedLines(rawText, availableW, measure);
+          
+          if (lines.length > 3) lines = lines.slice(0, 3);
+
           const totalTextH = lines.length * lineH;
           const startY = blockY + zaprBlockH / 2 - totalTextH / 2 + lineH / 2;
 
-          ctx.fillStyle = '#005baa';
-          ctx.font = `bold ${fontSize}px Lato, sans-serif`;
-          (ctx as any).letterSpacing = '0.005em'; // very tight, nearly zero tracking
+          ctx.fillStyle = boxColor;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           lines.forEach((line, i) => {
@@ -196,11 +315,9 @@ function App() {
         drawZaprBlock(zapr1Text, zaprY1);
 
         if (zapraszajacyCount === 2) {
-          // Thin 1px separator line then second block directly after (no colored gap)
-          const separatorY = zaprY1 + zaprBlockH;
-          ctx.fillStyle = '#c8d8ea';
-          ctx.fillRect(zaprX, separatorY, zaprW, 1);
-          drawZaprBlock(zapr2Text, separatorY + 1);
+          // Gap of 0.1U between the two blocks
+          const zaprY2 = zaprY1 + zaprBlockH + 0.1 * U;
+          drawZaprBlock(zapr2Text, zaprY2);
         }
       }
 
@@ -208,7 +325,8 @@ function App() {
       ctx.strokeStyle = frameColor;
       ctx.lineWidth = S;
       ctx.lineJoin = 'miter';
-      ctx.strokeRect(M + strokeOffset, M + strokeOffset, img.width - 2 * M - S, img.height - 2 * M - S);
+      const stopkaOffset = hasStopka ? footerH : 0;
+      ctx.strokeRect(M + strokeOffset, M + strokeOffset, img.width - 2 * M - S, img.height - stopkaOffset - 2 * M - S);
 
       // ── Krakow Logo Apla (drawn on top) ──
       const customizedSvg = rawSvgBlueprint.current!
@@ -224,7 +342,7 @@ function App() {
 
         // ── Stopka footer logos ──
         if (hasStopka && sponsorLogos.length > 0) {
-          const footerY = img.height + footerPad;
+          const footerY = img.height - footerH + footerPad;
           const availableW = img.width - 2 * M;
           const gap = 0.25 * U;
           const n = sponsorLogos.length;
@@ -247,7 +365,7 @@ function App() {
       };
       logoImg.src = base64Data;
     };
-  }, [imageSrc, theme, customColor, hasBelka, hasStopka, zapraszajacyCount, zapr1Text, zapr2Text, belkaText, sponsorLogos]);
+  }, [imageSrc, theme, customColor, hasBelka, hasStopka, zapraszajacyCount, zapr1Text, zapr2Text, zaprTransparentBg, belkaText, sponsorLogos]);
 
   const handleExport = async () => {
     const canvas = canvasRef.current;
@@ -326,14 +444,92 @@ function App() {
     const lH = U;
     const lW = lH * (466.944 / 143.38);
 
+    const footerPad = 0.25 * U;
+    const footerLogoH = 0.5 * U;
+    const footerH = hasStopka ? footerPad + footerLogoH + footerPad : 0;
+    const stopkaOffset = hasStopka ? footerH : 0;
+
     // ── Vector frame ──
-    let elements = `<rect x="${M+so}" y="${M+so}" width="${w-2*M-S}" height="${totalH-2*M-S}" stroke="${frameColor}" stroke-width="${S}" fill="none" stroke-linejoin="miter"/>`;
+    let elements = `<rect x="${M+so}" y="${M+so}" width="${w-2*M-S}" height="${totalH-stopkaOffset-2*M-S}" stroke="${frameColor}" stroke-width="${S}" fill="none" stroke-linejoin="miter"/>`;
+
+    // ── Stopka Background ──
+    if (hasStopka) {
+      elements += `\n<rect x="0" y="${totalH - footerH}" width="${w}" height="${footerH}" fill="#ffffff"/>`;
+    }
 
     // ── Belka ──
     if (hasBelka) {
-      const bY = totalH - U; const bH = 0.5 * U;
+      const rawText = belkaText.toUpperCase().trim();
+      
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      let lines = [rawText];
+      if (tempCtx) {
+        tempCtx.font = `bold ${0.22 * U}px Lato, sans-serif`;
+        (tempCtx as any).letterSpacing = '0.05em';
+        const paddingX = 1.0 * U;
+        const availableW = w - 2 * M - paddingX;
+        const measure = (s: string) => tempCtx.measureText(s).width;
+        lines = computeWrappedLines(rawText, availableW, measure).lines;
+      }
+      if (lines.length === 0) lines = [''];
+      if (lines.length > 3) lines = lines.slice(0, 3);
+
+      const lineHeight = 0.3 * U;
+      const bH = 0.5 * U + (lines.length - 1) * 0.3 * U;
+      const bY = totalH - M - stopkaOffset - bH;
+      
       elements += `\n<rect x="${M}" y="${bY}" width="${w-2*M}" height="${bH}" fill="${boxColor}"/>`;
-      elements += `\n<text x="${w/2}" y="${bY+bH/2}" fill="${textColor}" font-family="Lato,sans-serif" font-weight="bold" font-size="${0.22*U}" letter-spacing="0.05em" text-anchor="middle" dominant-baseline="central">${belkaText.toUpperCase().trim()}</text>`;
+      
+      const opticalOffsetY = 0.015 * U; // Optical adjustment to center uppercase text visually
+      const startY = bY + bH / 2 - (lines.length - 1) * lineHeight / 2 + opticalOffsetY;
+      lines.forEach((line, i) => {
+        elements += `\n<text x="${w/2}" y="${startY + i * lineHeight}" fill="${textColor}" font-family="Lato,sans-serif" font-weight="bold" font-size="${0.22*U}" letter-spacing="0.05em" text-anchor="middle" dominant-baseline="central">${line}</text>`;
+      });
+    }
+
+    // ── Zapraszający SVG ──
+    if (zapraszajacyCount > 0) {
+      const zX = M;
+      const zW = lW;
+      const zGap = 0.1 * U;
+      const zBlockH = 0.6 * U;
+      const zY1 = M + lH + zGap;
+
+      const appendZaprSvg = (text: string, bY: number) => {
+        if (!zaprTransparentBg) {
+          elements += `\n<rect x="${zX}" y="${bY}" width="${zW}" height="${zBlockH}" fill="#ffffff"/>`;
+        }
+        const rawText = text.toUpperCase().trim();
+        const fontSize = 0.14 * U;
+        const lineH = fontSize * 1.15;
+        
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        let lines = [rawText];
+        if (tempCtx) {
+          tempCtx.font = `bold ${fontSize}px Lato, sans-serif`;
+          (tempCtx as any).letterSpacing = '0.005em';
+          const zaprPad = 0.15 * U; // Increased padding
+          const availableW = zW - 2 * zaprPad;
+          const measure = (s: string) => tempCtx.measureText(s).width;
+          lines = computeWrappedLines(rawText, availableW, measure).lines;
+        }
+        if (lines.length > 3) lines = lines.slice(0, 3);
+
+        const totalTextH = lines.length * lineH;
+        const startY = bY + zBlockH / 2 - totalTextH / 2 + lineH / 2;
+        
+        lines.forEach((line, i) => {
+          elements += `\n<text x="${zX + zW / 2}" y="${startY + i * lineH}" fill="${boxColor}" font-family="Lato,sans-serif" font-weight="bold" font-size="${fontSize}" letter-spacing="0.005em" text-anchor="middle" dominant-baseline="central">${line}</text>`;
+        });
+      };
+
+      appendZaprSvg(zapr1Text, zY1);
+      if (zapraszajacyCount === 2) {
+        const zY2 = zY1 + zBlockH + 0.1 * U;
+        appendZaprSvg(zapr2Text, zY2);
+      }
     }
 
     // ── Inline logo SVG directly (nested <svg>) ──
@@ -349,19 +545,25 @@ function App() {
     const innerContent = innerContentMatch ? innerContentMatch[1].trim() : '';
     const logoElement = `<svg x="${M}" y="${M}" width="${lW}" height="${lH}" viewBox="${viewBox}" overflow="visible">${innerContent}</svg>`;
 
+    let imageElement = `<image xlink:href="${imageSrc}" href="${imageSrc}" x="0" y="0" width="${w}" height="${totalH}" preserveAspectRatio="none"/>`;
+    if (rawUploadedSvg) {
+      const srcSvgMatch = rawUploadedSvg.match(/<svg([^>]*)>([\s\S]*?)<\/svg>/i);
+      if (srcSvgMatch) {
+        let attrs = srcSvgMatch[1];
+        // Remove existing x, y, width, height, preserveAspectRatio, overflow so we can safely inject ours
+        attrs = attrs.replace(/\b(x|y|width|height|preserveAspectRatio|overflow)="[^"]*"/gi, '');
+        imageElement = `<svg x="0" y="0" width="${w}" height="${totalH}" preserveAspectRatio="none" overflow="visible"${attrs}>\n${srcSvgMatch[2]}\n</svg>`;
+      }
+    }
+
     // NOTE: We use BOTH xlink:href (Illustrator/legacy) and href (Figma/modern) on the image.
     return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${w} ${totalH}" width="${w}" height="${totalH}">
   <rect width="${w}" height="${totalH}" fill="#ffffff"/>
-  <image xlink:href="${imageSrc}" href="${imageSrc}" x="0" y="0" width="${w}" height="${totalH}" preserveAspectRatio="none"/>
+  ${imageElement}
   ${elements}
   ${logoElement}
 </svg>`;
   };
-
-  // ── Layer helpers ──
-  const zaprLabel = zapraszajacyCount === 0 ? t.zaprTile
-    : zapraszajacyCount === 1 ? `${t.zaprTile} ×1`
-    : `${t.zaprTile} ×2`;
 
   const layers = [
     { key: 'belka', label: t.belkaTile, active: hasBelka, onAdd: () => setHasBelka(true), onRemove: () => setHasBelka(false) },
@@ -402,7 +604,7 @@ function App() {
             </div>
           </div>
 
-          <div className="settings-panel">
+          <div className={`settings-panel ${!imageSrc ? 'disabled' : ''}`}>
             {/* Frame Elements */}
             <div className="control-group">
               <label>{t.frameElements}</label>
@@ -419,7 +621,14 @@ function App() {
 
                 {/* Zapraszający counter tile */}
                 <div className={`layer-tile ${zapraszajacyCount > 0 ? 'active' : ''}`}>
-                  <span className="layer-tile-label">{zaprLabel}</span>
+                  <span className="layer-tile-label">
+                    {t.zaprTile}
+                    {zapraszajacyCount > 0 && (
+                      <span style={{ display: 'block', fontSize: '0.8em', marginTop: '2px', opacity: 0.8 }}>
+                        ×{zapraszajacyCount}
+                      </span>
+                    )}
+                  </span>
                   <div style={{ display: 'flex', gap: '4px' }}>
                     {zapraszajacyCount > 0 && (
                       <button className="layer-tile-btn remove" onClick={() => setZapraszajacyCount((zapraszajacyCount - 1) as 0 | 1 | 2)}>−</button>
@@ -435,10 +644,18 @@ function App() {
             {/* Zapraszający text inputs */}
             {zapraszajacyCount >= 1 && (
               <div className="control-group layer-option">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', textTransform: 'none', color: 'var(--text-main)', marginBottom: '12px' }}>
+                  <input
+                    type="checkbox"
+                    checked={zaprTransparentBg}
+                    onChange={e => setZaprTransparentBg(e.target.checked)}
+                  />
+                  {(t as any).zaprTransparentBg}
+                </label>
                 <label>{t.zaprText1Label}</label>
                 <textarea
                   value={zapr1Text}
-                  onChange={e => setZapr1Text(e.target.value)}
+                  onChange={e => validateAndSetText(e.target.value, setZapr1Text, 'zapr')}
                   className="text-input"
                   rows={3}
                   style={{ resize: 'vertical' }}
@@ -450,7 +667,7 @@ function App() {
                 <label>{t.zaprText2Label}</label>
                 <textarea
                   value={zapr2Text}
-                  onChange={e => setZapr2Text(e.target.value)}
+                  onChange={e => validateAndSetText(e.target.value, setZapr2Text, 'zapr')}
                   className="text-input"
                   rows={3}
                   style={{ resize: 'vertical' }}
@@ -462,12 +679,13 @@ function App() {
             {hasBelka && (
               <div className="control-group layer-option">
                 <label>{t.belkaLabel}</label>
-                <input
-                  type="text"
+                <textarea
                   value={belkaText}
-                  onChange={e => setBelkaText(e.target.value)}
+                  onChange={e => validateAndSetText(e.target.value, setBelkaText, 'belka')}
                   className="text-input"
-                  placeholder={t.belkaPlaceholder}
+                  rows={3}
+                  style={{ resize: 'vertical' }}
+                  placeholder={(t as any).belkaPlaceholder}
                 />
               </div>
             )}
