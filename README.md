@@ -34,3 +34,14 @@ npm run dev
 - `npm run build` — Сборка проекта для production (готовые оптимизированные файлы появятся в папке `app/dist`).
 - `npm run preview` — Локальный предпросмотр уже собранного проекта (позволяет проверить, как проект будет работать на реальном сервере).
 - `npm run lint` — Запуск проверки качества кода с помощью ESLint.
+
+
+___
+
+### Deploy to firebase
+
+npm install -g firebase-tools
+firebase login
+firebase init hosting
+npm run build
+firebase deploy

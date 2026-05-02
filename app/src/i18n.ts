@@ -8,7 +8,6 @@ export const translations = {
     browseFiles: 'Browse Files',
     frameElements: 'Frame Elements',
     zaprText1Label: 'Inviting 1',
-    zaprText1Label: 'Inviting 1',
     zaprText2Label: 'Inviting 2',
     zaprTransparentBg: 'Transparent background',
     belkaLabel: 'Footer text',
